@@ -1,0 +1,3 @@
+[submodule "external/ReadStat"]
+	path = external/ReadStat
+	url = git@github.com:WizardMac/ReadStat.git
