@@ -3,12 +3,6 @@
 #include <memory>
 
 
-#include <arrow/compute/api.h>
-#include <vector>
-
-
-
-
 arrow::Status RunMain() {
 
 
@@ -94,56 +88,6 @@ arrow::Status RunMain() {
 }
 
 
-#include <vector>
-
-class Element1;
-class Element2;
-
-struct IVisitor {
-    virtual void visitElement1(const Element1 *ob) = 0;
-    virtual void visitElement2(const Element2 *ob) = 0;
-};
-
-struct IElement {
-    virtual void accept(IVisitor *v) const =0;
-};
-
-struct Element1: public IElement {
-    int x{10};
-    virtual void accept(IVisitor *v) const override {
-        v->visitElement1(this);
-    }
-};
-
-struct Element2: public IElement {
-    int y{20};
-    virtual void accept(IVisitor *v) const override {
-        v->visitElement2(this);
-    }
-};
-
-
-struct VisitorA: public IVisitor {
-    virtual void visitElement1(const Element1 *ob) override {
-        std::cout << "VisitorA = " << ob->x << std::endl;
-    };
-    virtual void visitElement2(const Element2 *ob) override {
-        std::cout << "VisitorA = " << ob->y << std::endl;
-    };
-};
-
-
-struct VisitorB: public IVisitor {
-    virtual void visitElement1(const Element1 *ob) override {
-        std::cout << "VisitorB = " << ob->x << std::endl;
-    };
-    virtual void visitElement2(const Element2 *ob) override {
-        std::cout << "VisitorB = " << ob->y << std::endl;
-    };
-};
-
-
-
 int main () {
     arrow::Status st = RunMain();
     if (!st.ok()) {
@@ -151,14 +95,6 @@ int main () {
         return 1;
     }
 
-    Element1 bb1;
-    Element2 bb2;
-    std::vector<IElement*> vec {&bb1, &bb2};
-
-    VisitorA va;
-    VisitorB vb;
-    for (auto el: vec) el->accept(&va);
-    for (auto el: vec) el->accept(&vb);
     return 0;
 }
 
