@@ -66,6 +66,17 @@
         "ios": "cpp",
         "locale": "cpp",
         "queue": "cpp",
-        "deque": "cpp"
+        "deque": "cpp",
+        "charconv": "cpp",
+        "format": "cpp",
+        "span": "cpp",
+        "text_encoding": "cpp",
+        "codecvt": "cpp",
+        "fstream": "cpp",
+        "iomanip": "cpp",
+        "list": "cpp",
+        "semaphore": "cpp",
+        "sstream": "cpp",
+        "stack": "cpp"
     }
 }

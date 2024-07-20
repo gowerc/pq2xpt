@@ -1,0 +1,34 @@
+
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build and Run",
+            "type": "shell",
+            "group": "test",
+            "options": {
+                "shell": {
+                    "executable": "bash",
+                    "args": [
+                        "-c"
+                    ]
+                }
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "command": "eval",
+            "args": [
+                "rm ./build/pq2xpt 2>/dev/null;",
+                "cmake -S . -B build;", 
+                "cmake --build build; ./build/pq2xpt",
+            ],
+            "problemMatcher": []
+        },
+    ]
+}
