@@ -83,45 +83,66 @@ struct VariableMeta {
     std::string format;
     int storage_width;
     std::string label;
-    readstat_variable_t* reference = nullptr;
 };
 
 
 
 struct I_Variable {
-    virtual void write_xpt_value(readstat_writer_t *writer, readstat_variable_t *reference) =0;
-    virtual ~I_Variable(){};
-};
-
-
-
-struct VarBoolean: public I_Variable {
     VariableMeta meta;
-    ChunkedArrayParser<arrow::BooleanType> parser;
-    VarBoolean(std::string varname, ChunkedArrayParser<arrow::BooleanType> arr):
-        parser{arr},
-        meta{VariableMeta{varname, READSTAT_TYPE_INT8, "", 8, ""}}{};
-
-    virtual void write_xpt_value(readstat_writer_s *writer, readstat_variable_s *reference) override {
-        readstat_insert_int8_value(writer, reference, this->parser.get_next_element());
-    }
-    virtual ~VarBoolean(){};
+    I_Variable(VariableMeta meta): meta{meta}{};
+    virtual void write_xpt_value(readstat_writer_t *writer, readstat_variable_t *reference) =0;
+    virtual ~I_Variable() = default;
 };
+
+
+
+// struct VarBoolean: public I_Variable {
+//     ChunkedArrayParser<arrow::BooleanType> parser;
+//     VarBoolean(std::string varname, ChunkedArrayParser<arrow::BooleanType> arr):
+//         parser{arr},
+//         meta{VariableMeta{varname, READSTAT_TYPE_INT8, "", 8, ""}}{};
+
+//     virtual void write_xpt_value(readstat_writer_s *writer, readstat_variable_s *reference) override {
+//         readstat_insert_int8_value(writer, reference, this->parser.get_next_element());
+//     }
+//     virtual ~VarBoolean(){};
+// };
 
 
 struct VarInt32: public I_Variable {
-    VariableMeta meta;
     ChunkedArrayParser<arrow::Int32Type> parser;
-    VarInt32(std::string varname, std::shared_ptr<arrow::ChunkedArray> arr):
-        parser{ChunkedArrayParser<arrow::Int32Type>(arr)},
-        meta{VariableMeta{varname, READSTAT_TYPE_INT32, "", 8, ""}}{};
+    VarInt32(
+        std::string varname,
+        std::shared_ptr<arrow::ChunkedArray> arr
+    ):
+        I_Variable(VariableMeta{varname, READSTAT_TYPE_INT32, "", 8, ""}),
+        parser{ChunkedArrayParser<arrow::Int32Type>(arr)}
+    {};
 
     virtual void write_xpt_value(readstat_writer_s *writer, readstat_variable_s *reference) override {
-        readstat_insert_int32_value(writer, reference, this->parser.get_next_element());
+        int x {this->parser.get_next_element()};
+        std::cout << "Writing x = " << x << std::endl;
+        readstat_insert_int32_value(writer, reference, x);
     }
-    virtual ~VarInt32(){};
+    virtual ~VarInt32() = default;
 };
 
+
+struct VarDouble: public I_Variable {
+    ChunkedArrayParser<arrow::DoubleType> parser;
+    VarDouble(
+        std::string varname,
+        std::shared_ptr<arrow::ChunkedArray> arr
+    ):
+        I_Variable(VariableMeta{varname, READSTAT_TYPE_DOUBLE, "", 8, ""}),
+        parser{ChunkedArrayParser<arrow::DoubleType>(arr)}
+    {};
+
+    virtual void write_xpt_value(readstat_writer_s *writer, readstat_variable_s *reference) override {
+        readstat_insert_double_value(writer, reference, this->parser.get_next_element());
+    }
+    virtual ~VarDouble() = default;
+};
 
 
 
@@ -137,28 +158,9 @@ static ssize_t write_bytes(const void *data, size_t len, void *ctx) {
 
 void write_xpt(
     std::string filename,
-    std::vector<VariableMeta> schema,
-    std::vector<std::shared_ptr<xpt_writer>> data,
+    std::vector<std::shared_ptr<I_Variable>> data,
     int row_count
 ) {
-    readstat_writer_t *writer = readstat_writer_init();
-    readstat_set_data_writer(writer, &write_bytes);
-    readstat_writer_set_file_label(writer, "My data set");
-
-    const int col_count = data.size();
-
-
-    for (VariableMeta &var: schema) {
-        var.reference = readstat_add_variable(
-            writer,
-            var.name.c_str(),
-            var.type,
-            var.storage_width
-        );
-        readstat_variable_set_label(var.reference, var.label.c_str());
-        readstat_variable_set_format(var.reference, var.format.c_str());
-    }
-
 
     std::ofstream outputFile {filename,  std::ios::out | std::ios::binary };
     if (!outputFile) {
@@ -166,12 +168,35 @@ void write_xpt(
         return;
     }
 
+    readstat_writer_t *writer = readstat_writer_init();
+    readstat_set_data_writer(writer, &write_bytes);
+    readstat_writer_set_file_label(writer, "My data set");
+
+    const int col_count = data.size();
+
+
+    std::vector<readstat_variable_t*> references;
+    references.reserve(col_count);
+    std::cout << "ref size = " << references.size() << std::endl;
+
+
+
+    for (int i = 0; i < col_count; i++) {
+        references.push_back(readstat_add_variable(
+            writer,
+            data.at(i)->meta.name.c_str(),
+            data.at(i)->meta.type,
+            data.at(i)->meta.storage_width
+        ));
+        readstat_variable_set_label(references.at(i), data.at(i)->meta.label.c_str());
+        readstat_variable_set_format(references.at(i), data.at(i)->meta.format.c_str());
+    }
 
     readstat_begin_writing_xport(writer, &outputFile, row_count);
     for (int i=0; i<row_count; i++) {
         readstat_begin_row(writer);
         for (int j=0; j<col_count; j++) {
-            data.at(j)->write_xpt_value(writer, schema.at(j).reference);
+            data.at(j)->write_xpt_value(writer, references.at(j));
         }
         readstat_end_row(writer);
     }
@@ -185,34 +210,32 @@ void write_xpt(
 
 arrow::Status RunMain() {
     std::shared_ptr<arrow::Table> parquet_table;
-    ARROW_ASSIGN_OR_RAISE(parquet_table, read_parquet("data/test_cpp.parquet"));
-
+    ARROW_ASSIGN_OR_RAISE(parquet_table, read_parquet("data/performance.parquet"));
 
     std::vector<std::string> column_names = parquet_table->ColumnNames();
 
     std::vector<std::shared_ptr<I_Variable>> pqdata;
-    pqdata.push_back(
-        std::make_shared<VarInt32>(
-            VarInt32(
-                "myvar1",
-                parquet_table->GetColumnByName(column_names.at(1))
-            )
-                
-            )
-            parquet_table->GetColumnByName(column_names.at(0))
-        )
-    );
-    pqdata.push_back(
-        std::make_shared<ChunkedArrayParser<arrow::Int8Type>>(
-            ChunkedArrayParser<arrow::Int8Type>{}
-        )
-    );
 
-    std::vector<VariableMeta> vars;
-    vars.push_back(VariableMeta{});
-    vars.push_back(VariableMeta{"Var2", READSTAT_TYPE_INT32, "", 8, "My Label 2"});
+    for (int i = 1; i < column_names.size(); i++) {
+        std::cout << column_names.at(i) << std::endl;
+        pqdata.push_back(
+            std::make_shared<VarDouble>(
+                VarDouble(
+                    column_names.at(i),
+                    parquet_table->GetColumnByName(column_names.at(i))
+                )
+            )
+        );
+    }
 
-    write_xpt("data/something2.xpt", vars, pqdata, parquet_table->num_rows());
+
+    // std::cout << x1->parser.next_element_index << std::endl;
+    // std::cout << x1->parser.get_next_element() << std::endl;
+    // std::cout << x1->parser.get_next_element() << std::endl;
+    // std::cout << x1->parser.get_next_element() << std::endl;
+
+
+    write_xpt("data/something2.xpt", pqdata, parquet_table->num_rows());
 
 
     return arrow::Status::OK();
