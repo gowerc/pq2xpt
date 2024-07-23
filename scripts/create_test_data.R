@@ -43,6 +43,8 @@ system.time({
     arrow::write_parquet(dat, "data/performance.parquet")
 })
 
+
+
 system.time({
     dat2 <- arrow::read_parquet("data/performance.parquet")
     haven::write_xpt(dat2, "data/performance.xpt")
