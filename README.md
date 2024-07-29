@@ -2,6 +2,27 @@
 
 # Parquet -> XPT
 
+## Installation
+
+- Clone repo including submodules
+```
+git clone --recurse-submodules https://github.com/gowerc/pq2xpt.git
+```
+
+- Install arrow / parquet
+```
+# Debian / Ubuntu
+sudo apt install -y -V libparquet-dev
+
+# Fedora / RHEL
+sudo dnf install -y parquet-devel
+```
+
+- Configure and Build
+```
+cmake -S . -B build
+cmake --build build
+```
 
 ## TODOs
 
@@ -26,3 +47,6 @@
 - [ ] `haven::write_xpt()` converts Inf / -Inf to NA.
     - [ ] Need to check if this is expected behaviour as it appears XPT does support Inf/-Inf (though need to check how SAS interprets these values)
 
+- [ ] Lots and lots of testing
+
+- [ ] Proper performance benchmarks
