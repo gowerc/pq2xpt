@@ -30,5 +30,33 @@
             ],
             "problemMatcher": []
         },
+        {
+            "label": "Build",
+            "type": "shell",
+            "group": "build",
+            "options": {
+                "shell": {
+                    "executable": "bash",
+                    "args": [
+                        "-c"
+                    ]
+                }
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "command": "eval",
+            "args": [
+                "rm ./build/pq2xpt 2>/dev/null;",
+                "cmake -S . -B build;", 
+                "cmake --build build",
+            ],
+            "problemMatcher": []
+        },
     ]
 }

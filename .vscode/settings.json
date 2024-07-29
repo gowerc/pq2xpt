@@ -77,6 +77,15 @@
         "list": "cpp",
         "semaphore": "cpp",
         "sstream": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "__memory": "cpp",
+        "chrono": "cpp",
+        "print": "cpp",
+        "forward_list": "cpp",
+        "unordered_set": "cpp",
+        "regex": "cpp",
+        "__tree": "cpp",
+        "map": "cpp",
+        "set": "cpp"
     }
 }
