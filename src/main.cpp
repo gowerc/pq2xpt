@@ -119,29 +119,6 @@ void write_xpt(
 
 arrow::Status RunMain() {
 
-
-    std::map<arrow::Type::type, WriterConstructor> writerMap = {
-        {
-            arrow::Type::DOUBLE,
-            [](std::string colname, ChunkedArrayPtr arr) -> I_WriterPtr {
-                return std::make_shared<DoubleParser>(colname, arr);
-            }
-        },
-        {
-            arrow::Type::INT32,
-            [](std::string colname, ChunkedArrayPtr arr) -> I_WriterPtr {
-                return std::make_shared<Int32Parser>(colname, arr);
-            }
-        },
-        {
-            arrow::Type::STRING,
-            [](std::string colname, ChunkedArrayPtr arr) -> I_WriterPtr  {
-                return std::make_shared<StringParser>(colname, arr);
-            }
-        }
-    };
-
-
     //std::string datafile = "data/simple_data";
     std::string datafile = "data/performance";
 
@@ -155,9 +132,23 @@ arrow::Status RunMain() {
 
 
     for (int i = 0; i < column_names.size(); i++) {
+
         arrow::Type::type ColType = parquet_table->column(i)->type()->id();
-        if (writerMap.find(ColType) != writerMap.end()) {
-            pqdata.push_back(writerMap[ColType](column_names.at(i), parquet_table->column(i)));
+        std::string colname = column_names.at(i);
+        auto coldata = parquet_table->column(i);
+
+        switch(ColType) {
+            case arrow::Type::DOUBLE:
+                pqdata.push_back(std::make_shared<DoubleParser>(colname, coldata));
+                break;
+            case arrow::Type::INT32:
+                pqdata.push_back(std::make_shared<Int32Parser>(colname, coldata));
+                break;
+            case arrow::Type::STRING:
+                pqdata.push_back(std::make_shared<StringParser>(colname, coldata));
+                break;
+            default:
+                std::cout << "Unsupported Column Type" << std::endl;
         }
     }
     write_xpt(datafile + "_cpp.xpt", pqdata, parquet_table->num_rows());
