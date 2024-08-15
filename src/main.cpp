@@ -20,12 +20,16 @@ extern "C" {
 
 
 
-using I_WriterPtr = std::shared_ptr<I_Writer>;
-using ChunkedArrayPtr = std::shared_ptr<arrow::ChunkedArray>;
-using WriterConstructor = std::function<std::shared_ptr<I_Writer>(std::string, ChunkedArrayPtr)>;
+// using I_WriterPtr = std::shared_ptr<I_Writer>;
+// using ChunkedArrayPtr = std::shared_ptr<arrow::ChunkedArray>;
+// using WriterConstructor = std::function<std::shared_ptr<I_Writer>(std::string, ChunkedArrayPtr)>;
 
 
-
+using XptWriter = std::function<void(
+    readstat_writer_s *writer,
+    readstat_variable_s *reference,
+    int i
+)>;
 
 
 arrow::Result<std::shared_ptr<arrow::Table>> read_parquet(std::string file) {
@@ -67,7 +71,8 @@ static ssize_t write_bytes(const void *data, size_t len, void *ctx) {
 
 void write_xpt(
     std::string filename,
-    std::vector<std::shared_ptr<I_Writer>> &data,
+    std::vector<XptWriter> &xptwriters,
+    std::vector<VariableMeta> &metadata,
     int row_count
 ) {
     std::cout << "Starting xpt write" << std::endl;
@@ -80,7 +85,7 @@ void write_xpt(
     readstat_writer_t *writer = readstat_writer_init();
     readstat_set_data_writer(writer, &write_bytes);
 
-    const int col_count = data.size();
+    const int col_count = xptwriters.size();
 
     std::vector<readstat_variable_t*> references;
     references.reserve(col_count);
@@ -88,19 +93,19 @@ void write_xpt(
     for (int i = 0; i < col_count; i++) {
         references.push_back(readstat_add_variable(
             writer,
-            data.at(i)->meta.name.c_str(),
-            data.at(i)->meta.type,
-            data.at(i)->meta.storage_width
+            metadata.at(i).name.c_str(),
+            metadata.at(i).type,
+            metadata.at(i).storage_width
         ));
-        readstat_variable_set_label(references.at(i), data.at(i)->meta.label.c_str());
-        readstat_variable_set_format(references.at(i), data.at(i)->meta.format.c_str());
+        readstat_variable_set_label(references.at(i), metadata.at(i).label.c_str());
+        readstat_variable_set_format(references.at(i), metadata.at(i).format.c_str());
     }
 
     readstat_begin_writing_xport(writer, &outputFile, row_count);
     for (int i=0; i<row_count; i++) {
         readstat_begin_row(writer);
         for (int j=0; j<col_count; j++) {
-            data.at(j)->write_xpt(writer, references[j], i);
+            xptwriters[j](writer, references[j], i);
         }
         readstat_end_row(writer);
     }
@@ -127,9 +132,11 @@ arrow::Status RunMain() {
 
     std::vector<std::string> column_names = parquet_table->ColumnNames();
 
-    std::vector<I_WriterPtr> pqdata;
+    std::vector<XptWriter> pqdata;
     pqdata.reserve(column_names.size());
 
+    std::vector<VariableMeta> metadata;
+    metadata.reserve(column_names.size());
 
     for (int i = 0; i < column_names.size(); i++) {
 
@@ -139,19 +146,28 @@ arrow::Status RunMain() {
 
         switch(ColType) {
             case arrow::Type::DOUBLE:
-                pqdata.push_back(std::make_shared<DoubleParser>(colname, coldata));
+                pqdata.push_back(DoubleParser(coldata));
+                metadata.push_back(VariableMeta{colname, READSTAT_TYPE_DOUBLE, "", 8, ""});
                 break;
             case arrow::Type::INT32:
-                pqdata.push_back(std::make_shared<Int32Parser>(colname, coldata));
+                pqdata.push_back(Int32Parser(coldata));
+                metadata.push_back(VariableMeta{colname, READSTAT_TYPE_INT32, "", 8, ""});
                 break;
             case arrow::Type::STRING:
-                pqdata.push_back(std::make_shared<StringParser>(colname, coldata));
+                pqdata.push_back(StringParser(coldata));
+                metadata.push_back(
+                    VariableMeta{colname, READSTAT_TYPE_STRING, "", max_char_len(coldata).ValueOrDie(), ""}
+                );
+                break;
+            case arrow::Type::BOOL:
+                pqdata.push_back(BoolParser(coldata));
+                metadata.push_back(VariableMeta{colname, READSTAT_TYPE_INT8, "", 8, ""});
                 break;
             default:
                 std::cout << "Unsupported Column Type" << std::endl;
         }
     }
-    write_xpt(datafile + "_cpp.xpt", pqdata, parquet_table->num_rows());
+    write_xpt(datafile + "_cpp.xpt", pqdata, metadata, parquet_table->num_rows());
 
     return arrow::Status::OK();
 }

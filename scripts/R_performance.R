@@ -5,10 +5,15 @@ haven::write_xpt(dat2, "data/performance.xpt")
 
 
 
+time_it <- function(expr) {
+    start_time <- Sys.time()
+    eval(expr)
+    end_time <- Sys.time()
+    difftime(end_time, start_time, units = "secs")
+}
 
 
-
-system.time({
+time_it({
     dat2 <- arrow::read_parquet("data/performance.parquet")
     haven::write_xpt(dat2, "data/performance_r.xpt")
 })

@@ -63,7 +63,8 @@ dat <- generate_test_data(
     n_col = 0,
     n_character = 10,
     n_float = 10,
-    n_integer = 10
+    n_integer = 10,
+    n_logical = 10,
 )
 arrow::write_parquet(dat, "data/performance.parquet")
 
